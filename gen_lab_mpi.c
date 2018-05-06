@@ -326,19 +326,23 @@ int main(int argc, char* argv[argc+1])
 				}
 	}	/* fin while */
 
-	if(MPI_Send(chunk,taille_chunk_courant*M,MPI_INT,0,rank,MPI_COMM_WORLD) != MPI_SUCCESS)
+
+	if(rank != 0)
 	{
-		perror("Erreur ssend");
-		MPI_Finalize();
-		exit(EXIT_FAILURE);
+		if(MPI_Send(chunk,taille_chunk_courant*M,MPI_INT,0,rank,MPI_COMM_WORLD) != MPI_SUCCESS)
+		{
+			perror("Erreur ssend");
+			MPI_Finalize();
+			exit(EXIT_FAILURE);
+		}
+
+		printf("Envoyé\n");
 	}
-
-	printf("Envoyé\n");
-
-
-	if(rank == 0)
+	else
 	{
-		for(i=0;i<size-1;i++)
+		memcpy(l,chunk,taille_chunk_courant*M*sizeof(int));
+
+		for(i=1;i<size-1;i++)
 		{
 			if(MPI_Recv(&l[i*taille_chunk],taille_chunk*M,MPI_INT,i,i,MPI_COMM_WORLD,&status) != MPI_SUCCESS)
 			{
@@ -386,6 +390,7 @@ int main(int argc, char* argv[argc+1])
 
 	#ifdef AFFICHE
 		refresh();
+		printf("wait\n");
 		waitgraph(); /* attend que l'utilisateur tape une touche */
 		closegraph();
 	#endif /* AFFICHE */
