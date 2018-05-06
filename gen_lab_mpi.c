@@ -12,7 +12,7 @@
 #include <string.h>
 
 /* à commenter pour désactiver l'affichage */
-#define AFFICHE
+//#define AFFICHE
 
 /* nombre de cases constructibles minimal */
 #define CONSMIN 10
@@ -32,6 +32,12 @@
 #define NBCOL 120
 /* taux de rafraichissement de l'affichage */
 #define REFRESH 20
+
+#ifdef AFFICHE
+	int ref=REFRESH;
+#endif /* AFFICHE */
+
+
 
 /* fonction qui affiche un carre de cote CARRE dans la case (i,j) */
 static
@@ -61,33 +67,95 @@ int estconstructible( size_t N, size_t M, int l[N][M], int i, int j)
 }
 
 
-void ecriture(int N, int M, int l[N][M],char* file)
+void generation(int taille_chunk_courant, int M, int chunk[taille_chunk_courant][M])
 {
-		int f = open( file, O_WRONLY|O_CREAT, 0644 );
-		int x = N;
-		if(write( f, &x, sizeof(int) ) == -1)
+	/* initialise les cases constructibles */
+	int nbcons = 0, i, j;
+	for(i=1 ; i<taille_chunk_courant-1 ; i++ )
+		for( int j=1 ; j<M-1 ; j++ )
+			if( estconstructible( taille_chunk_courant, M, chunk, i, j ) )
+			{
+				chunk[i][j] = -1;
+				nbcons++;
+			}
+	/* supprime quelques cases constructibles sur les bords */
+	for(i=1 ; i<taille_chunk_courant-1 ; i++ )
+	{
+		if( chunk[i][1] == -1 && (rand()%PROBPASCONS) && nbcons>(CONSMIN*2) )
 		{
-			perror("Erreur write");
-			exit(EXIT_FAILURE);
+			chunk[i][1] = 1;
+			nbcons--;
 		}
-		x = M;
-		if(write( f, &x, sizeof(int) ) == -1)
+		if( chunk[i][M-2] == -1 && (rand()%PROBPASCONS) && nbcons>(CONSMIN*2) )
 		{
-			perror("Erreur write");
-			exit(EXIT_FAILURE);
+			chunk[i][M-2] = 1;
+			nbcons--;
 		}
-		if(write( f, l, N*M*sizeof(int) ) == -1)
+	}
+  	for(j=1 ; j<M-1 ; j++ )
+  	{
+		if( chunk[1][j] == -1 && (rand()%PROBPASCONS) && nbcons>CONSMIN )
 		{
-			perror("Erreur write");
-			exit(EXIT_FAILURE);
+			chunk[1][j] = 1;
+			nbcons--;
 		}
-		close( f );
+		if( chunk[taille_chunk_courant-2][j] == -1 && (rand()%PROBPASCONS) && nbcons>CONSMIN )
+		{
+			chunk[taille_chunk_courant-2][j] = 1;
+			nbcons--;
+		}
+	}
+
+
+	while( nbcons )
+	{
+		int r = 1 + rand() % nbcons;
+		for( i=1 ; i<taille_chunk_courant-1 ; i++ )
+		{
+			for( j=1 ; j<M-1 ; j++ )
+				if( chunk[i][j] == -1 )
+					if( ! --r )
+						break;
+			if( ! r )
+				break;
+		}
+		/* on construit en (i,j) */
+		chunk[i][j] = 0;
+
+#ifdef AFFICHE
+		affichecarre(i,j);
+		if( ! --ref )
+		{
+			refresh();
+			ref = REFRESH;
+		}
+#endif /* AFFICHE */
+
+		nbcons --;
+		/* met a jour les 8 voisins */
+		for( int ii=i-1 ; ii<=i+1 ; ++ii )
+			for( int jj=j-1 ; jj<=j+1 ; ++jj )
+				if( chunk[ii][jj]==1 && estconstructible(taille_chunk_courant, M, chunk, ii,jj) )
+				{
+					nbcons ++;
+					chunk[ii][jj] = -1;
+				}
+				else if( chunk[ii][jj]==-1 && ! estconstructible(taille_chunk_courant, M, chunk, ii,jj) )
+				{
+					nbcons --;
+					chunk[ii][jj] = 1;
+				}
+	}	/* fin while */
+
 }
 
 
 
 int main(int argc, char* argv[argc+1])
 {
+	double temps = MPI_Wtime();
+
+
 	if(MPI_Init(&argc,&argv))
 	{
 		perror("MPI_Init failed");
@@ -103,10 +171,8 @@ int main(int argc, char* argv[argc+1])
 
 	//TODO ceci doit etre seulement fait par rank == 0 ?
 
-	int i = 0, j = 0, nbilots = NBILOTS/size, nbcons;
-#ifdef AFFICHE
-	int ref=REFRESH;
-#endif /* AFFICHE */
+	int i = 0, j = 0, nbilots = NBILOTS/size;
+
 
 	if( argc > 1 )
 		nbilots = strtoull(argv[1], 0, 0)/size;
@@ -159,7 +225,6 @@ int main(int argc, char* argv[argc+1])
 			exit(EXIT_FAILURE);
 		}
 
-		printf("Envoyé\n");
 
 	}
 
@@ -190,13 +255,9 @@ int main(int argc, char* argv[argc+1])
 		}
 	}
 
-	printf("Recu\n");
 
 	char file[6];
 	sprintf(file,"%d.out",rank);
-
-	ecriture(taille_chunk_courant,M,chunk,file);
-
 
 
 	/* place <nbilots> ilots aleatoirement a l'interieur du laby */
@@ -211,7 +272,7 @@ int main(int argc, char* argv[argc+1])
 	//TODO affichage que par le 0
 
 #ifdef AFFICHE
-	initgraph(M*(CARRE+INTER), N*(CARRE+INTER));
+	initgraph(M*(CARRE+INTER), taille_chunk_courant*(CARRE+INTER));
 	for( int i=0 ; i<taille_chunk_courant ; i++ )
 		for( int j=0 ; j<M ; j++ )
 			if( chunk[i][j]==0 )
@@ -220,112 +281,7 @@ int main(int argc, char* argv[argc+1])
 #endif /* AFFICHE */
 
 
-
-	/* initialise les cases constructibles */
-	nbcons = 0;
-	for( int i=1 ; i<taille_chunk_courant-1 ; i++ )
-		for( int j=1 ; j<M-1 ; j++ )
-			if( estconstructible( taille_chunk_courant, M, chunk, i, j ) )
-			{
-				chunk[i][j] = -1;
-				nbcons++;
-			}
-	/* supprime quelques cases constructibles sur les bords */
-	for( int i=1 ; i<taille_chunk_courant-1 ; i++ )
-	{
-		if( chunk[i][1] == -1 && (rand()%PROBPASCONS) && nbcons>(CONSMIN*2) )
-		{
-			chunk[i][1] = 1;
-			nbcons--;
-		}
-		if( chunk[i][M-2] == -1 && (rand()%PROBPASCONS) && nbcons>(CONSMIN*2) )
-		{
-			chunk[i][M-2] = 1;
-			nbcons--;
-		}
-	}
-  	for( int j=1 ; j<M-1 ; j++ )
-  	{
-		if( chunk[1][j] == -1 && (rand()%PROBPASCONS) && nbcons>CONSMIN )
-		{
-			chunk[1][j] = 1;
-			nbcons--;
-		}
-		if( chunk[taille_chunk_courant-2][j] == -1 && (rand()%PROBPASCONS) && nbcons>CONSMIN )
-		{
-			chunk[taille_chunk_courant-2][j] = 1;
-			nbcons--;
-		}
-	}
-
-	printf("Avant\n");
-
-
-
-
-	/*
-	MPI_Datatype chunk_type;
-	MPI_Datatype dernier_chunk_type;
-	if(MPI_Type_vector(N,taille_chunk,M,MPI_INT,&chunk_type) != MPI_SUCCESS)
-	{
-		errno("Erreur MPI_type_vector");
-		MPI_Finalize();
-		exit(EXIT_FAILURE);
-	}
-
-	if(MPI_Type_vector(N,taille_dernier_chunk,M,MPI_INT,&dernier_chunk_type) != MPI_SUCCESS)
-	{
-		errno("Erreur MPI_type_vector");
-		MPI_Finalize();
-		exit(EXIT_FAILURE);
-	}*/
-
-	
-	/* boucle principale de génération */
-
-	printf("cons %d\n",nbcons);
-
-
-	while( nbcons )
-	{
-		int r = 1 + rand() % nbcons;
-		for( i=1 ; i<taille_chunk_courant-1 ; i++ )
-		{
-			for( j=1 ; j<M-1 ; j++ )
-				if( chunk[i][j] == -1 )
-					if( ! --r )
-						break;
-			if( ! r )
-				break;
-		}
-		/* on construit en (i,j) */
-		chunk[i][j] = 0;
-
-#ifdef AFFICHE
-		affichecarre(i,j);
-		if( ! --ref )
-		{
-			refresh();
-			ref = REFRESH;
-		}
-#endif /* AFFICHE */
-
-		nbcons --;
-		/* met a jour les 8 voisins */
-		for( int ii=i-1 ; ii<=i+1 ; ++ii )
-			for( int jj=j-1 ; jj<=j+1 ; ++jj )
-				if( chunk[ii][jj]==1 && estconstructible(taille_chunk_courant, M, chunk, ii,jj) )
-				{
-					nbcons ++;
-					chunk[ii][jj] = -1;
-				}
-				else if( chunk[ii][jj]==-1 && ! estconstructible(taille_chunk_courant, M, chunk, ii,jj) )
-				{
-					nbcons --;
-					chunk[ii][jj] = 1;
-				}
-	}	/* fin while */
-
+	generation(taille_chunk_courant,M,chunk);
 
 	if(rank != 0)
 	{
@@ -336,7 +292,6 @@ int main(int argc, char* argv[argc+1])
 			exit(EXIT_FAILURE);
 		}
 
-		printf("Envoyé\n");
 	}
 	else
 	{
@@ -359,11 +314,18 @@ int main(int argc, char* argv[argc+1])
 			exit(EXIT_FAILURE);
 		}
 
-		printf("recu\n");
+
+
+		int (*tmp)[M] = malloc(sizeof(int[8][M]));
+		for(i=1;i<size;i++)
+		{
+			memcpy(tmp,&l[taille_chunk*i-4][0],8*M*sizeof(int));
+			generation(8,M,tmp);
+			memcpy(&l[taille_chunk*i-4][0],tmp,8*M*sizeof(int));
+		}
 
 
 
-		printf("Ecriture\n");
 
 		/* ENREGISTRE UN FICHIER. Format : LARGEUR(int), HAUTEUR(int), tableau brut (N*M (int))*/
 		int f = open( "laby.lab", O_WRONLY|O_CREAT, 0644 );
@@ -386,20 +348,22 @@ int main(int argc, char* argv[argc+1])
 		}
 		close( f );
 
-		printf("Attente\n");
 
+	}
 	#ifdef AFFICHE
 		refresh();
-		printf("wait\n");
 		waitgraph(); /* attend que l'utilisateur tape une touche */
 		closegraph();
 	#endif /* AFFICHE */
 
-	}
 
 	MPI_Finalize();
 
 	free(l);
+
+	if(rank == 0)
+	printf("Temps : %f\n",MPI_Wtime() - temps);
+
 	return EXIT_SUCCESS;
 }
 
