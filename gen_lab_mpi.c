@@ -1,3 +1,8 @@
+/**
+ * CONSTANS Victor
+ * Code source de la génération de labyrinthe parallélisé avec MPI
+ */
+
 #include <stdio.h>
 #include <time.h>
 #include <stdlib.h>
@@ -186,7 +191,8 @@ int main(int argc, char* argv[argc+1])
         size_t M = 600;
 	if( argc > 3 )
 		N = strtoull(argv[3], 0, 0);
-        int (*l)[M] = malloc(sizeof(int[N][M]));
+
+	int (*l)[M] = malloc(sizeof(int[N][M]));
 
 	srand( time(0) );
 
@@ -214,6 +220,9 @@ int main(int argc, char* argv[argc+1])
 			{
 				perror("Erreur ssend");
 				MPI_Finalize();
+				if(rank == 0)
+					free(l);
+
 				exit(EXIT_FAILURE);
 			}
 		}
@@ -222,6 +231,9 @@ int main(int argc, char* argv[argc+1])
 		{
 			perror("Erreur ssend");
 			MPI_Finalize();
+			if(rank == 0)
+				free(l);
+
 			exit(EXIT_FAILURE);
 		}
 
@@ -251,13 +263,14 @@ int main(int argc, char* argv[argc+1])
 		{
 			perror("Erreur recv");
 			MPI_Finalize();
+			if(rank == 0)
+				free(l);
+
+			free(chunk);
+
 			exit(EXIT_FAILURE);
 		}
 	}
-
-
-	char file[6];
-	sprintf(file,"%d.out",rank);
 
 
 	/* place <nbilots> ilots aleatoirement a l'interieur du laby */
@@ -289,6 +302,11 @@ int main(int argc, char* argv[argc+1])
 		{
 			perror("Erreur ssend");
 			MPI_Finalize();
+			if(rank == 0)
+				free(l);
+
+			free(chunk);
+
 			exit(EXIT_FAILURE);
 		}
 
@@ -303,6 +321,11 @@ int main(int argc, char* argv[argc+1])
 			{
 				perror("Erreur recv");
 				MPI_Finalize();
+				if(rank == 0)
+					free(l);
+
+				free(chunk);
+
 				exit(EXIT_FAILURE);
 			}
 		}
@@ -311,6 +334,11 @@ int main(int argc, char* argv[argc+1])
 		{
 			perror("Erreur recv");
 			MPI_Finalize();
+			if(rank == 0)
+				free(l);
+
+			free(chunk);
+
 			exit(EXIT_FAILURE);
 		}
 
@@ -324,6 +352,8 @@ int main(int argc, char* argv[argc+1])
 			memcpy(&l[taille_chunk*i-4][0],tmp,8*M*sizeof(int));
 		}
 
+		free(tmp);
+
 
 
 
@@ -333,17 +363,34 @@ int main(int argc, char* argv[argc+1])
 		if(write( f, &x, sizeof(int) ) == -1)
 		{
 			perror("Erreur write");
+			MPI_Finalize();
+			if(rank == 0)
+				free(l);
+
+			free(chunk);
 			exit(EXIT_FAILURE);
 		}
 		x = M;
 		if(write( f, &x, sizeof(int) ) == -1)
 		{
 			perror("Erreur write");
+			MPI_Finalize();
+			if(rank == 0)
+				free(l);
+
+			free(chunk);
+
 			exit(EXIT_FAILURE);
 		}
 		if(write( f, l, N*M*sizeof(int) ) == -1)
 		{
 			perror("Erreur write");
+			MPI_Finalize();
+			if(rank == 0)
+				free(l);
+
+			free(chunk);
+
 			exit(EXIT_FAILURE);
 		}
 		close( f );
@@ -359,10 +406,13 @@ int main(int argc, char* argv[argc+1])
 
 	MPI_Finalize();
 
-	free(l);
+	if(rank == 0)
+		free(l);
+
+	free(chunk);
 
 	if(rank == 0)
-	printf("Temps : %f\n",MPI_Wtime() - temps);
+		printf("%f\n",MPI_Wtime() - temps);
 
 	return EXIT_SUCCESS;
 }
