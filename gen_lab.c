@@ -8,8 +8,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+
+#include <mpi.h>
+
 /* à commenter pour désactiver l'affichage */
-#define AFFICHE
+//#define AFFICHE
 
 /* nombre de cases constructibles minimal */
 #define CONSMIN 10
@@ -60,6 +63,8 @@ int estconstructible( size_t N, size_t M, int l[N][M], int i, int j)
 
 int main(int argc, char* argv[argc+1])
 {
+	double temps = MPI_Wtime();
+
 	int i = 0, j = 0, nbilots = NBILOTS, nbcons;
 #ifdef AFFICHE
 	int ref=REFRESH;
@@ -192,10 +197,22 @@ int main(int argc, char* argv[argc+1])
 	/* ENREGISTRE UN FICHIER. Format : LARGEUR(int), HAUTEUR(int), tableau brut (N*M (int))*/
 	int f = open( "laby.lab", O_WRONLY|O_CREAT, 0644 );
 	int x = N;
-	write( f, &x, sizeof(int) );
+	if(write( f, &x, sizeof(int) ) == -1)
+	{
+		perror("Erreur write");
+		exit(EXIT_FAILURE);
+	}
 	x = M;
-	write( f, &x, sizeof(int) );
-	write( f, l, N*M*sizeof(int) );
+	if(write( f, &x, sizeof(int) ) == -1)
+	{
+		perror("Erreur write");
+		exit(EXIT_FAILURE);
+	}
+	if(write( f, l, N*M*sizeof(int) ) == -1)
+	{
+		perror("Erreur write");
+		exit(EXIT_FAILURE);
+	}
 	close( f );
 
 #ifdef AFFICHE
@@ -205,6 +222,9 @@ int main(int argc, char* argv[argc+1])
 #endif /* AFFICHE */
 
 	free(l);
+
+	printf("Temps : %f\n",MPI_Wtime() - temps);
+
 	return EXIT_SUCCESS;
 }
 

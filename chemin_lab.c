@@ -202,8 +202,16 @@ int main(int argc, char **argv)
         /* taille du laby (N=hauteur, M=largeur) : */
         int N, M;
 
-	read( f, &N, sizeof(int) );
-	read( f, &M, sizeof(int) );
+	if(read( f, &N, sizeof(int) ) == -1)
+	{
+		perror("Erreur read");
+		exit(EXIT_FAILURE);
+	}
+	if(read( f, &M, sizeof(int) ) == -1)
+	{
+		perror("Erreur read");
+		exit(EXIT_FAILURE);
+	}
 
 	int (*l)[M] = malloc( sizeof(int[N][M]) );
 	if( read( f, &l[0][0], sizeof(int[N][M]) ) != sizeof(int[N][M]) )
