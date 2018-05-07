@@ -27,7 +27,7 @@ do
 	while [ $i -lt $iteration ]
 	do
 		mpirun ./gen_lab $nbilot $j $j >> res_$j
-		mpirun -n $2 ./gen_lab_mpi $nbilot $j $j >> res_$j
+		mpirun -n $coeur ./gen_lab_mpi $nbilot $j $j >> res_$j
 		i=$(($i + 1))
 	done
 
