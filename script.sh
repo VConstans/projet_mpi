@@ -1,38 +1,38 @@
 #! /bin/bash
 
-if [ -f res ]
+if [ -f res_100 ]
 then
-	rm res
+	rm res_*
+fi
+
+if [ -f graph.plot ]
+then
+	rm graph.plot
 fi
 
 nbilot=20
-N=400
-M=600
 
-iteration=$1
-coeur=$2
+iteration=20
+coeur=4
 
-if [ $# -eq 3 ]
+if [ $# -eq 1 ]
 then
 	nbilot=$3
 fi
 
-if [ $# -eq 4 ]
-then
-	N=$4
-fi
-
-if [ $# -eq 5 ]
-then
-	M=$5
-fi
-
-i=0
-while [ $i -lt $iteration ]
+j=100
+while [ $j -lt 1500 ]
 do
-	mpirun -n $2 ./gen_lab_mpi >> res
-	i=$(($i + 1))
+	i=0
+	while [ $i -lt $iteration ]
+	do
+		mpirun ./gen_lab $nbilot $j $j >> res_$j
+		mpirun -n $2 ./gen_lab_mpi $nbilot $j $j >> res_$j
+		i=$(($i + 1))
+	done
+
+awk -v iteration=$iteration -v taille=$j -f calcul.awk res_$j >> graph.plot
+echo $j
+
+j=$(($j + 100))
 done
-
-
-awk -f calcul.awk res

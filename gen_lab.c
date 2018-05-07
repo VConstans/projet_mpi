@@ -223,7 +223,7 @@ int main(int argc, char* argv[argc+1])
 
 	free(l);
 
-	printf("Temps : %f\n",MPI_Wtime() - temps);
+	printf("%f\n",MPI_Wtime() - temps);
 
 	return EXIT_SUCCESS;
 }
