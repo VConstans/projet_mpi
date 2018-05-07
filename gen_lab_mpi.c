@@ -17,7 +17,7 @@
 #include <string.h>
 
 /* à commenter pour désactiver l'affichage */
-//#define AFFICHE
+#define AFFICHE
 
 /* nombre de cases constructibles minimal */
 #define CONSMIN 10
@@ -192,13 +192,20 @@ int main(int argc, char* argv[argc+1])
 	if( argc > 3 )
 		M = strtoull(argv[3], 0, 0);
 
-	int (*l)[M] = malloc(sizeof(int[N][M]));
+	int taille_chunk = N / size;
+
+	if(N % size != 0)
+	{
+		taille_chunk ++;
+	}
+
+	int taille_dernier_chunk = N - (taille_chunk * (size - 1));
+
+	int (*l)[M] = malloc(sizeof(int[taille_chunk * size][M]));
 
 	srand( time(0) );
 
 
-	int taille_chunk = N / size;
-	int taille_dernier_chunk = N - (taille_chunk * (size - 1));
 
 	if(rank == 0)
 	{
@@ -212,8 +219,8 @@ int main(int argc, char* argv[argc+1])
 				}
 				else
 					l[i][j] = 1; /* vide */
-
-		int i;
+	}
+	/*	int i;
 		for(i=1;i<size-1;i++)
 		{
 			if(MPI_Send(&l[i*taille_chunk],taille_chunk*M,MPI_INT,i,i,MPI_COMM_WORLD) != MPI_SUCCESS)
@@ -238,7 +245,7 @@ int main(int argc, char* argv[argc+1])
 		}
 
 
-	}
+	}*/
 
 	int taille_chunk_courant;
 	if(rank == size-1)
@@ -250,9 +257,22 @@ int main(int argc, char* argv[argc+1])
 		taille_chunk_courant = taille_chunk;
 	}
 
-        int (*chunk)[M] = malloc(sizeof(int[taille_chunk_courant][M]));
-	MPI_Status status;
+        int (*chunk)[M] = malloc(sizeof(int[taille_chunk][M]));
 
+
+	if(MPI_Scatter(l,taille_chunk * M,MPI_INT,chunk,taille_chunk * M,MPI_INT,0,MPI_COMM_WORLD) != MPI_SUCCESS)
+	{
+			perror("Erreur recv");
+			MPI_Finalize();
+			if(rank == 0)
+				free(l);
+
+			free(chunk);
+
+			exit(EXIT_FAILURE);
+	}
+
+/*
 	if(rank == 0)
 	{
 		memcpy(chunk,l,taille_chunk_courant*M*sizeof(int));	
@@ -271,7 +291,7 @@ int main(int argc, char* argv[argc+1])
 			exit(EXIT_FAILURE);
 		}
 	}
-
+*/
 
 	/* place <nbilots> ilots aleatoirement a l'interieur du laby */
 	for( ; nbilots ; nbilots-- )
@@ -296,6 +316,7 @@ int main(int argc, char* argv[argc+1])
 
 	generation(taille_chunk_courant,M,chunk);
 
+/*
 	if(rank != 0)
 	{
 		if(MPI_Send(chunk,taille_chunk_courant*M,MPI_INT,0,rank,MPI_COMM_WORLD) != MPI_SUCCESS)
@@ -342,8 +363,23 @@ int main(int argc, char* argv[argc+1])
 			exit(EXIT_FAILURE);
 		}
 
+*/
+	if(MPI_Gather(chunk,taille_chunk * M,MPI_INT,l,taille_chunk * M,MPI_INT,0,MPI_COMM_WORLD) != MPI_SUCCESS)
+	{
+			perror("Erreur recv");
+			MPI_Finalize();
+			if(rank == 0)
+				free(l);
+
+			free(chunk);
+
+			exit(EXIT_FAILURE);
+	}
 
 
+
+	if(rank == 0)
+	{
 		int (*tmp)[M] = malloc(sizeof(int[8][M]));
 		for(i=1;i<size;i++)
 		{
