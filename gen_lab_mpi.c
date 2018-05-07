@@ -17,7 +17,7 @@
 #include <string.h>
 
 /* à commenter pour désactiver l'affichage */
-#define AFFICHE
+//#define AFFICHE
 
 /* nombre de cases constructibles minimal */
 #define CONSMIN 10
