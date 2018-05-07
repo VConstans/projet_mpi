@@ -81,7 +81,7 @@ int main(int argc, char* argv[argc+1])
 	/* largeur : */
         size_t M = 600;
 	if( argc > 3 )
-		N = strtoull(argv[3], 0, 0);
+		M = strtoull(argv[3], 0, 0);
         int (*l)[M] = malloc(sizeof(int[N][M]));
 
 	srand( time(0) );
