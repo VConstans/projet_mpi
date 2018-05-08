@@ -64,3 +64,5 @@ gen_lab
 gen_lab_mpi
 chemin_lab
 res
+*.plot
+*.png
