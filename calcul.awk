@@ -19,7 +19,7 @@ BEGIN	{somme=0; carre=0; nb=0;somme_mpi=0;carre_mpi=0;}
 END	{
 		printf("%s ",taille);
 		printf("%f ",somme/iteration);
-		printf("%f ", (sqrt(carre*iteration - somme * somme)/iteration));
+		printf("%f ", 3 * (sqrt(carre*iteration - somme * somme)/iteration));
 		printf("%f ",somme_mpi/iteration);
-		printf("%f\n", (sqrt(carre_mpi*iteration - somme_mpi * somme_mpi)/iteration));
+		printf("%f\n", 3 * (sqrt(carre_mpi*iteration - somme_mpi * somme_mpi)/iteration));
 	}
