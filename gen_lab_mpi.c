@@ -17,7 +17,7 @@
 #include <string.h>
 
 /* à commenter pour désactiver l'affichage */
-//#define AFFICHE
+#define AFFICHE
 
 /* nombre de cases constructibles minimal */
 #define CONSMIN 10
@@ -72,6 +72,9 @@ int estconstructible( size_t N, size_t M, int l[N][M], int i, int j)
 }
 
 
+/**
+ * Fonction de génération du labyrinthe dans le chunk de taille taille_chunk_courant * M
+ */
 void generation(int taille_chunk_courant, int M, int chunk[taille_chunk_courant][M])
 {
 	/* initialise les cases constructibles */
@@ -161,6 +164,10 @@ int main(int argc, char* argv[argc+1])
 	double temps = MPI_Wtime();
 
 
+	/* Initialisation de MPI et récupération des informations telle
+	 * que le nombre de processus utilisés et le rang du
+	 * processus courant
+	 */
 	if(MPI_Init(&argc,&argv))
 	{
 		perror("MPI_Init failed");
@@ -174,11 +181,15 @@ int main(int argc, char* argv[argc+1])
 	MPI_Comm_size(MPI_COMM_WORLD,&size);
 
 
-	//TODO ceci doit etre seulement fait par rank == 0 ?
-
 	int i = 0, j = 0, nbilots = NBILOTS/size;
 
 
+	/* Récupération du nombre d'ilots total a placer dans le
+	 * labyrinthe. On divise ce nombre par le nombre de porcessus
+	 * pour obtenir le nombre d'ilot que chaque processus va devoir
+	 * placer individuellement sur son morceau de labyrinthe pour
+	 * pouvoir lancer la génération
+	 */
 	if( argc > 1 )
 		nbilots = strtoull(argv[1], 0, 0)/size;
 
@@ -192,13 +203,22 @@ int main(int argc, char* argv[argc+1])
 	if( argc > 3 )
 		M = strtoull(argv[3], 0, 0);
 
+	/* Calcul de la hauteur des chunk sauf le dernier qui aura
+	 * une taille égal ou plus petite que les autres, pour pouvoir
+	 * gérer les cas où la hauteur du labyrinthe n'est pas un
+	 * multiple du nombre de processus
+	 */
 	int taille_chunk = N / size;
 
+	/*On arrondi la taille des chunk (sauf le dernier) à l'entier
+	 * supérieur
+	 */
 	if(N % size != 0)
 	{
 		taille_chunk ++;
 	}
 
+	//Calcul de la hauteur du dernier chunk (le plus petit)
 	int taille_dernier_chunk = N - (taille_chunk * (size - 1));
 
 	int (*l)[M] = malloc(sizeof(int[taille_chunk * size][M]));
@@ -207,6 +227,7 @@ int main(int argc, char* argv[argc+1])
 
 
 
+	// Initialisation du labyrinthe uniquement faite par le processus 0 (root)
 	if(rank == 0)
 	{
 
@@ -220,33 +241,10 @@ int main(int argc, char* argv[argc+1])
 				else
 					l[i][j] = 1; /* vide */
 	}
-	/*	int i;
-		for(i=1;i<size-1;i++)
-		{
-			if(MPI_Send(&l[i*taille_chunk],taille_chunk*M,MPI_INT,i,i,MPI_COMM_WORLD) != MPI_SUCCESS)
-			{
-				perror("Erreur ssend");
-				MPI_Finalize();
-				if(rank == 0)
-					free(l);
 
-				exit(EXIT_FAILURE);
-			}
-		}
-
-		if(MPI_Send(&l[i*taille_chunk],taille_dernier_chunk*M,MPI_INT,i,i,MPI_COMM_WORLD) != MPI_SUCCESS)
-		{
-			perror("Erreur ssend");
-			MPI_Finalize();
-			if(rank == 0)
-				free(l);
-
-			exit(EXIT_FAILURE);
-		}
-
-
-	}*/
-
+	/* Assignation à chaque processus de la hauteur du chunk 
+	 * auquel il va devoir générer la parie de labyrinthe
+	 */
 	int taille_chunk_courant;
 	if(rank == size-1)
 	{
@@ -257,41 +255,23 @@ int main(int argc, char* argv[argc+1])
 		taille_chunk_courant = taille_chunk;
 	}
 
+	// Allocation du chunk qui va servir à stocker le morceau de labyrinthe
         int (*chunk)[M] = malloc(sizeof(int[taille_chunk][M]));
 
 
+	/**
+	 * Distribution des morceaux de labyrinthe au différents processus
+	 */
 	if(MPI_Scatter(l,taille_chunk * M,MPI_INT,chunk,taille_chunk * M,MPI_INT,0,MPI_COMM_WORLD) != MPI_SUCCESS)
 	{
-			perror("Erreur recv");
+			perror("Erreur MPI_Scatter");
 			MPI_Finalize();
-			if(rank == 0)
-				free(l);
-
+			free(l);
 			free(chunk);
 
 			exit(EXIT_FAILURE);
 	}
 
-/*
-	if(rank == 0)
-	{
-		memcpy(chunk,l,taille_chunk_courant*M*sizeof(int));	
-	}
-	else
-	{
-		if(MPI_Recv(chunk,taille_chunk_courant*M,MPI_INT,0,rank,MPI_COMM_WORLD,&status) != MPI_SUCCESS)
-		{
-			perror("Erreur recv");
-			MPI_Finalize();
-			if(rank == 0)
-				free(l);
-
-			free(chunk);
-
-			exit(EXIT_FAILURE);
-		}
-	}
-*/
 
 	/* place <nbilots> ilots aleatoirement a l'interieur du laby */
 	for( ; nbilots ; nbilots-- )
@@ -302,7 +282,6 @@ int main(int argc, char* argv[argc+1])
 	}
 
 
-	//TODO affichage que par le 0
 
 #ifdef AFFICHE
 	initgraph(M*(CARRE+INTER), taille_chunk_courant*(CARRE+INTER));
@@ -314,63 +293,19 @@ int main(int argc, char* argv[argc+1])
 #endif /* AFFICHE */
 
 
+	// Génération du labyrinthe
 	generation(taille_chunk_courant,M,chunk);
 
-/*
-	if(rank != 0)
-	{
-		if(MPI_Send(chunk,taille_chunk_courant*M,MPI_INT,0,rank,MPI_COMM_WORLD) != MPI_SUCCESS)
-		{
-			perror("Erreur ssend");
-			MPI_Finalize();
-			if(rank == 0)
-				free(l);
 
-			free(chunk);
-
-			exit(EXIT_FAILURE);
-		}
-
-	}
-	else
-	{
-		memcpy(l,chunk,taille_chunk_courant*M*sizeof(int));
-
-		for(i=1;i<size-1;i++)
-		{
-			if(MPI_Recv(&l[i*taille_chunk],taille_chunk*M,MPI_INT,i,i,MPI_COMM_WORLD,&status) != MPI_SUCCESS)
-			{
-				perror("Erreur recv");
-				MPI_Finalize();
-				if(rank == 0)
-					free(l);
-
-				free(chunk);
-
-				exit(EXIT_FAILURE);
-			}
-		}
-
-		if(MPI_Recv(&l[i*taille_chunk],taille_dernier_chunk*M,MPI_INT,i,i,MPI_COMM_WORLD,&status) != MPI_SUCCESS)
-		{
-			perror("Erreur recv");
-			MPI_Finalize();
-			if(rank == 0)
-				free(l);
-
-			free(chunk);
-
-			exit(EXIT_FAILURE);
-		}
-
-*/
+	/**
+	 * Rassemblement des différents morceaux du labyrinthe pour que le processus 0 ai une version complete
+	 * du labyrinthe
+	 */
 	if(MPI_Gather(chunk,taille_chunk * M,MPI_INT,l,taille_chunk * M,MPI_INT,0,MPI_COMM_WORLD) != MPI_SUCCESS)
 	{
-			perror("Erreur recv");
+			perror("Erreur MPI_Gather");
 			MPI_Finalize();
-			if(rank == 0)
-				free(l);
-
+			free(l);
 			free(chunk);
 
 			exit(EXIT_FAILURE);
@@ -380,6 +315,10 @@ int main(int argc, char* argv[argc+1])
 
 	if(rank == 0)
 	{
+		/**
+		 * Passe itérative du processus 0 sur les jonctions de morceaux
+		 * pour combler le vide entre les morceaux
+		 */
 		int (*tmp)[M] = malloc(sizeof(int[8][M]));
 		for(i=1;i<size;i++)
 		{
@@ -400,10 +339,9 @@ int main(int argc, char* argv[argc+1])
 		{
 			perror("Erreur write");
 			MPI_Finalize();
-			if(rank == 0)
-				free(l);
-
+			free(l);
 			free(chunk);
+
 			exit(EXIT_FAILURE);
 		}
 		x = M;
@@ -411,9 +349,7 @@ int main(int argc, char* argv[argc+1])
 		{
 			perror("Erreur write");
 			MPI_Finalize();
-			if(rank == 0)
-				free(l);
-
+			free(l);
 			free(chunk);
 
 			exit(EXIT_FAILURE);
@@ -422,9 +358,7 @@ int main(int argc, char* argv[argc+1])
 		{
 			perror("Erreur write");
 			MPI_Finalize();
-			if(rank == 0)
-				free(l);
-
+			free(l);
 			free(chunk);
 
 			exit(EXIT_FAILURE);
@@ -442,8 +376,7 @@ int main(int argc, char* argv[argc+1])
 
 	MPI_Finalize();
 
-	if(rank == 0)
-		free(l);
+	free(l);
 
 	free(chunk);
 
