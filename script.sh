@@ -21,7 +21,7 @@ then
 fi
 
 j=100
-while [ $j -lt 1500 ]
+while [ $j -le 1000 ]
 do
 	i=0
 	while [ $i -lt $iteration ]

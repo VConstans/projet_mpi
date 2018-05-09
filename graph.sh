@@ -6,7 +6,7 @@ gnuplot << EOF
 	set ylabel "Temps (en s)"
 
 	plot "graph.plot" u 1:2 title "normal" w l, \
-	"graph.plot" u 1:2:3 title "normal" w yerrorbars, \
+	"graph.plot" u 1:2:3 title "interal de confiance normal" w yerrorbars, \
 	"graph.plot" u 1:4 title "MPI" w l , \
-	"graph.plot" u 1:4:5 title "MPI" w yerrorbars
+	"graph.plot" u 1:4:5 title "interval de confiance MPI" w yerrorbars
 EOF
